@@ -1,0 +1,2 @@
+org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
+  tech.guyi.web.quick.service.AutoConfiguration
