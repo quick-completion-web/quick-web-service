@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import tech.guyi.web.quick.core.controller.ResponseContent;
 import tech.guyi.web.quick.core.controller.ResponseEntities;
+import tech.guyi.web.quick.service.entity.QuickEntity;
 import tech.guyi.web.quick.service.getter.GetService;
 import tech.guyi.web.quick.service.search.SearchCreator;
 

@@ -8,14 +8,17 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.lang.Nullable;
+import tech.guyi.web.quick.core.exception.WebRequestException;
 import tech.guyi.web.quick.service.entity.QuickEntity;
 import tech.guyi.web.quick.service.getter.GetRepository;
 import tech.guyi.web.quick.service.search.entry.SearchItem;
+import tech.guyi.web.quick.service.service.verifier.UniquenessVerifierItem;
 
 import javax.persistence.criteria.CriteriaBuilder;
 import javax.persistence.criteria.CriteriaQuery;
 import javax.persistence.criteria.Predicate;
 import javax.persistence.criteria.Root;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -29,6 +32,10 @@ import java.util.Optional;
 public interface QuickService<E,ID> extends GetRepository<E,ID> {
 
     Class<E> entityClass();
+
+    default List<UniquenessVerifierItem<E>> verifiers(){
+        return Collections.emptyList();
+    }
 
     default Predicate buildCondition(Root<E> root, CriteriaQuery<?> query, CriteriaBuilder builder, SearchItem condition){
         return condition.getType().getHandler().toPredicate(root,query,builder,condition);
@@ -49,28 +56,41 @@ public interface QuickService<E,ID> extends GetRepository<E,ID> {
         );
     }
 
-    default <S extends E> void autoTime(S entity) {
+    default void autoTime(E entity) {
         if (entity instanceof QuickEntity){
-            if (((QuickEntity) entity).getCreateTime() == null){
-                ((QuickEntity) entity).setCreateTime(System.currentTimeMillis());
+            if (((QuickEntity<?>) entity).getCreateTime() == null){
+                ((QuickEntity<?>) entity).setCreateTime(System.currentTimeMillis());
             }
-            ((QuickEntity) entity).setUpdateTime(System.currentTimeMillis());
+            ((QuickEntity<?>) entity).setUpdateTime(System.currentTimeMillis());
+        }
+    }
+
+    default void autoVerifier(E entity){
+        if (entity instanceof QuickEntity){
+            this.verifiers().forEach(item ->
+                    this.findOne((root,query,builder) -> item.getVerifier().apply(root,query,builder,entity))
+                            .map(QuickEntity.class::cast)
+                            .filter(e -> !e.getId().equals(((QuickEntity<?>) entity).getId()))
+                            .ifPresent(e -> {
+                                throw new WebRequestException(item.getMessage());
+                            }));
         }
     }
 
     /**
      * 保存实体, 自动填充创建及更新时间
-     * @see #save(S)
+     * @see #save(E)
      */
-    default <S extends E> S autoSave(S entity){
+    default E autoSave(E entity){
+        this.autoVerifier(entity);
         this.autoTime(entity);
         return this.save(entity);
     }
 
     /**
-     * @see JpaRepository#save(S)
+     * @see tech.guyi.web.quick.service.repository.QuickRepository#save(Object)
      */
-    default <S extends E> S save(S entity){
+    default E save(E entity){
         return this.getRepository().save(entity);
     }
 
@@ -103,7 +123,7 @@ public interface QuickService<E,ID> extends GetRepository<E,ID> {
     }
 
     /**
-     * @see JpaRepository#delete(E)
+     * @see JpaRepository#delete(Object)
      */
     default void delete(E entity){
         this.getRepository().delete(entity);
@@ -156,14 +176,14 @@ public interface QuickService<E,ID> extends GetRepository<E,ID> {
     /**
      * @see JpaRepository#saveAll(Iterable)
      */
-    default <S extends E> List<S> saveAll(Iterable<S> entities){
+    default List<E> saveAll(Iterable<E> entities){
         return this.getRepository().saveAll(entities);
     }
 
     /**
-     * @see JpaRepository#saveAndFlush(S)
+     * @see JpaRepository#saveAndFlush(Object)
      */
-    default <S extends E> S saveAndFlush(S entity){
+    default E saveAndFlush(E entity){
         return this.getRepository().saveAndFlush(entity);
     }
 
@@ -191,14 +211,14 @@ public interface QuickService<E,ID> extends GetRepository<E,ID> {
     /**
      * @see JpaRepository#findAll(Example)
      */
-    default <S extends E> List<S> findAll(Example<S> example){
+    default List<E> findAll(Example<E> example){
         return this.getRepository().findAll(example);
     }
 
     /**
      * @see JpaRepository#findAll(Example, Sort) 
      */
-    default <S extends E> List<S> findAll(Example<S> example, Sort sort){
+    default List<E> findAll(Example<E> example, Sort sort){
         return this.getRepository().findAll(example,sort);
     }
 
